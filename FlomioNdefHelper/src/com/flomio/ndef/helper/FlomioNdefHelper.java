@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Formatter;
 
+import com.flomio.ndef.helper.exceptions.NdefException;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 
@@ -77,7 +78,7 @@ public class FlomioNdefHelper {
 		}
 		return msgs;
 	}
-	
+
 	/*
 	 * Returns NDEF Messages from the tag
 	 */
@@ -86,11 +87,11 @@ public class FlomioNdefHelper {
 		byte[] payload = ndefMessages[0].getRecords()[0].getPayload();
 		return mUrlNdefDecode(payload);
 	}
-	
+
 	/*
 	 * Writes a URI to the tag
 	 */
-	public static boolean writeUrlToTag(URI uri, Tag tag) {
+	public static boolean writeUrlToTag(URI uri, Tag tag) throws NdefException {
 		try {
 			return writeUrlToTag(uri.toURL(), tag);
 		} catch (MalformedURLException e) {
@@ -103,7 +104,7 @@ public class FlomioNdefHelper {
 	/*
 	 * Writes a URL to the tag
 	 */
-	public static boolean writeUrlToTag(URL url, Tag tag) {
+	public static boolean writeUrlToTag(URL url, Tag tag) throws NdefException {
 		byte[] payload = mUrlNdefEncode(url);
 		NdefRecord textRecord = new NdefRecord(NdefRecord.TNF_WELL_KNOWN,
 				NdefRecord.RTD_URI, new byte[0], payload);
@@ -111,46 +112,48 @@ public class FlomioNdefHelper {
 				new NdefRecord[] { textRecord });
 		return writeNdefTag(textMessage, tag);
 	}
-	
+
 	/*
 	 * Writes text to tag
 	 */
-	public static boolean writeTextToTag(String text, Tag tag) {
+	public static boolean writeTextToTag(String text, Tag tag)
+			throws NdefException {
 		NdefRecord textRecord = new NdefRecord(NdefRecord.TNF_WELL_KNOWN,
 				NdefRecord.RTD_TEXT, new byte[0], text.getBytes());
 		NdefMessage textMessage = new NdefMessage(
 				new NdefRecord[] { textRecord });
 		return FlomioNdefHelper.writeNdefTag(textMessage, tag);
 	}
-	
+
 	/*
 	 * Writes vCard to tag
 	 */
-	public static boolean writeVcardToTag(String text, Tag tag) {
-		NdefRecord textRecord = new NdefRecord(NdefRecord.TNF_MIME_MEDIA,
-				"text/x-vcard".getBytes(), new byte[0], text.getBytes());
-		
-		NdefMessage textMessage = new NdefMessage(
-				new NdefRecord[] { textRecord });
-		return FlomioNdefHelper.writeNdefTag(textMessage, tag);
-	}
-	
-	
+	//TODO: write this
+//	public static boolean writeVcardToTag(String text, Tag tag)
+//			throws NdefException {
+//		NdefRecord textRecord = new NdefRecord(NdefRecord.TNF_MIME_MEDIA,
+//				"text/x-vcard".getBytes(), new byte[0], text.getBytes());
+//
+//		NdefMessage textMessage = new NdefMessage(
+//				new NdefRecord[] { textRecord });
+//		return FlomioNdefHelper.writeNdefTag(textMessage, tag);
+//	}
 
 	/*
 	 * Writes an NdefMessage to a NFC tag
 	 */
-	public static boolean writeNdefTag(NdefMessage message, Tag tag) {
+	public static boolean writeNdefTag(NdefMessage message, Tag tag)
+			throws NdefException {
 		int size = message.toByteArray().length;
 		try {
 			Ndef ndef = Ndef.get(tag);
 			if (ndef != null) {
 				ndef.connect();
 				if (!ndef.isWritable()) {
-					return false;
+					throw new NdefException("this tag isn't writeable");
 				}
 				if (ndef.getMaxSize() < size) {
-					return false;
+					throw new NdefException("this tag isn't large enough");
 				}
 				ndef.writeNdefMessage(message);
 				return true;
@@ -162,14 +165,14 @@ public class FlomioNdefHelper {
 						format.format(message);
 						return true;
 					} catch (IOException e) {
-						return false;
+						throw new NdefException(e.getMessage());
 					}
 				} else {
 					return false;
 				}
 			}
 		} catch (Exception e) {
-			return false;
+			throw new NdefException(e.getMessage());
 		}
 	}
 
@@ -220,7 +223,7 @@ public class FlomioNdefHelper {
 		// protocol
 
 		byte[] pathByte = new byte[payload.length];
-		System.arraycopy(payload, 1, pathByte, 0, payload.length-2);
+		System.arraycopy(payload, 1, pathByte, 0, payload.length - 1);
 
 		String prefix = URI_PREFIX_MAP.get(payload[0]);
 		String path = new String(pathByte);
